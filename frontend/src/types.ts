@@ -6,6 +6,7 @@ export interface AnalysisMetrics {
   clicheCount: number;
   humanScore: number;
   verdictText: string;
+  flaggedSentences?: string[];
 }
 
 // Interface for server configuration
@@ -20,6 +21,7 @@ export interface ServerConfiguration {
 export interface HumanizePayload {
   sourceText: string;
   toneValue: string;
+  modeValue?: 'fast' | 'deep';
   modelName?: string;
   providerUrl?: string;
   apiKey?: string;

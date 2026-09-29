@@ -11,6 +11,9 @@ export function useHumanizer() {
   // Selected tone style
   const [toneValue, setToneValue] = useState<string>('natural');
 
+  // Selected processing mode (fast vs deep)
+  const [modeValue, setModeValue] = useState<'fast' | 'deep'>('fast');
+
   // Metrics analysis states
   const [sourceAnalysis, setSourceAnalysis] = useState<AnalysisMetrics | null>(null);
   const [resultAnalysis, setResultAnalysis] = useState<AnalysisMetrics | null>(null);
@@ -86,6 +89,7 @@ export function useHumanizer() {
       const responseData = await apiService.humanizeContent({
         sourceText,
         toneValue,
+        modeValue,
         modelName: modelName.trim() || undefined,
         providerUrl: providerUrl.trim() || undefined,
         apiKey: apiKey.trim() || undefined,
@@ -107,6 +111,8 @@ export function useHumanizer() {
     resultText,
     toneValue,
     setToneValue,
+    modeValue,
+    setModeValue,
     sourceAnalysis,
     resultAnalysis,
     providerUrl,

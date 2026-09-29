@@ -21,6 +21,8 @@ export const App: React.FC = () => {
     resultText,
     toneValue,
     setToneValue,
+    modeValue,
+    setModeValue,
     sourceAnalysis,
     resultAnalysis,
     providerUrl,
@@ -57,20 +59,49 @@ export const App: React.FC = () => {
 
         {/* Toolbar controls with generous pill sizing */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-1">
-          <div className="inline-flex items-center gap-1.5 p-1.5 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs">
-            {TONE_OPTIONS.map((option) => (
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Tone selector */}
+            <div className="inline-flex items-center gap-1.5 p-1.5 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs">
+              {TONE_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  onClick={() => setToneValue(option.id)}
+                  className={`px-5 py-2 text-sm transition-all rounded-full ${
+                    toneValue === option.id
+                      ? 'bg-stone-900 text-white font-medium shadow-xs'
+                      : 'text-stone-600 hover:text-stone-950 font-normal hover:bg-stone-200/50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Mode selector */}
+            <div className="inline-flex items-center gap-1 p-1 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs text-xs">
               <button
-                key={option.id}
-                onClick={() => setToneValue(option.id)}
-                className={`px-5 py-2 text-sm transition-all rounded-full ${
-                  toneValue === option.id
-                    ? 'bg-stone-900 text-white font-medium shadow-xs'
-                    : 'text-stone-600 hover:text-stone-950 font-normal hover:bg-stone-200/50'
+                onClick={() => setModeValue('fast')}
+                className={`px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+                  modeValue === 'fast'
+                    ? 'bg-white text-stone-900 font-semibold shadow-xs'
+                    : 'text-stone-600 hover:text-stone-900'
                 }`}
+                title="1-Pass Fast Humanization"
               >
-                {option.label}
+                <span>⚡ Cepat</span>
               </button>
-            ))}
+              <button
+                onClick={() => setModeValue('deep')}
+                className={`px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+                  modeValue === 'deep'
+                    ? 'bg-white text-stone-900 font-semibold shadow-xs'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+                title="Multi-Pass Adversarial Loopback Refinement"
+              >
+                <span>✨ Luwes Mendalam</span>
+              </button>
+            </div>
           </div>
 
           <button
@@ -79,7 +110,13 @@ export const App: React.FC = () => {
             className="flex items-center gap-2 px-7 py-2.5 rounded-full text-sm font-semibold bg-stone-900 hover:bg-stone-800 text-white shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
           >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />}
-            <span>{isLoading ? 'Humanizing...' : 'Humanize Text'}</span>
+            <span>
+              {isLoading
+                ? modeValue === 'deep'
+                  ? 'Memoles Mendalam...'
+                  : 'Luweskan Teks...'
+                : 'Luweskan Teks'}
+            </span>
           </button>
         </div>
 
