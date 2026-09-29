@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, Zap, Sparkles } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useHumanizer } from './hooks/useHumanizer';
 import { Header } from './components/Header';
 import { EditorCard } from './components/EditorCard';
@@ -57,15 +57,15 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Toolbar controls with space-between layout */}
+        {/* Toolbar controls with space-between layout and uniform height */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-1">
           {/* Left: Tone selector */}
-          <div className="inline-flex items-center gap-1.5 p-1.5 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs">
+          <div className="h-11 inline-flex items-center gap-1 p-1 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs">
             {TONE_OPTIONS.map((option) => (
               <button
                 key={option.id}
                 onClick={() => setToneValue(option.id)}
-                className={`px-5 py-2 text-sm transition-all rounded-full ${
+                className={`h-full px-5 flex items-center justify-center text-sm transition-all rounded-full ${
                   toneValue === option.id
                     ? 'bg-stone-900 text-white font-medium shadow-xs'
                     : 'text-stone-600 hover:text-stone-950 font-normal hover:bg-stone-200/50'
@@ -78,37 +78,35 @@ export const App: React.FC = () => {
 
           {/* Right: Mode selector and action button */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-1 p-1 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs text-xs">
+            <div className="h-11 inline-flex items-center gap-1 p-1 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs">
               <button
                 onClick={() => setModeValue('fast')}
-                className={`px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+                className={`h-full px-5 flex items-center justify-center text-sm transition-all rounded-full ${
                   modeValue === 'fast'
-                    ? 'bg-white text-stone-900 font-semibold shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
+                    ? 'bg-stone-900 text-white font-medium shadow-xs'
+                    : 'text-stone-600 hover:text-stone-950 font-normal hover:bg-stone-200/50'
                 }`}
                 title="1-Pass Fast Humanization"
               >
-                <Zap className="w-3.5 h-3.5 text-stone-700" strokeWidth={1.8} />
-                <span>Cepat</span>
+                Cepat
               </button>
               <button
                 onClick={() => setModeValue('deep')}
-                className={`px-3.5 py-1.5 rounded-full transition-all flex items-center gap-1.5 ${
+                className={`h-full px-5 flex items-center justify-center text-sm transition-all rounded-full ${
                   modeValue === 'deep'
-                    ? 'bg-white text-stone-900 font-semibold shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
+                    ? 'bg-stone-900 text-white font-medium shadow-xs'
+                    : 'text-stone-600 hover:text-stone-950 font-normal hover:bg-stone-200/50'
                 }`}
                 title="Multi-Pass Adversarial Loopback Refinement"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" strokeWidth={1.8} />
-                <span>Luwes Mendalam</span>
+                Luwes Mendalam
               </button>
             </div>
 
             <button
               onClick={executeHumanize}
               disabled={isLoading}
-              className="flex items-center gap-2 px-7 py-2.5 rounded-full text-sm font-semibold bg-stone-900 hover:bg-stone-800 text-white shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+              className="h-11 flex items-center justify-center gap-2 px-7 rounded-full text-sm font-semibold bg-stone-900 hover:bg-stone-800 text-white shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
               {isLoading && <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />}
               <span>
