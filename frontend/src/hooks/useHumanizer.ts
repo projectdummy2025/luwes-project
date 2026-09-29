@@ -18,6 +18,7 @@ export function useHumanizer() {
   // Settings states stored in local storage
   const [providerUrl, setProviderUrl] = useState<string>(() => localStorage.getItem('providerUrl') || '');
   const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('apiKey') || '');
+  const [modelName, setModelName] = useState<string>(() => localStorage.getItem('modelName') || '');
 
   // UI status states
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -33,12 +34,19 @@ export function useHumanizer() {
     localStorage.setItem('apiKey', apiKey);
   }, [apiKey]);
 
+  useEffect(() => {
+    localStorage.setItem('modelName', modelName);
+  }, [modelName]);
+
   // Load server config on initial mount
   useEffect(() => {
     apiService.fetchConfig()
       .then((serverConfig) => {
         if (!providerUrl && serverConfig.providerUrl) {
           setProviderUrl(serverConfig.providerUrl);
+        }
+        if (!modelName && serverConfig.modelName) {
+          setModelName(serverConfig.modelName);
         }
       })
       .catch((error) => {
@@ -63,7 +71,7 @@ export function useHumanizer() {
     return () => clearTimeout(timerId);
   }, [sourceText]);
 
-  // Execute humanization with claude-opus-5
+  // Execute humanization with selected model
   const executeHumanize = async () => {
     // Guard clause for empty input
     if (!sourceText.trim()) {
@@ -78,6 +86,7 @@ export function useHumanizer() {
       const responseData = await apiService.humanizeContent({
         sourceText,
         toneValue,
+        modelName: modelName.trim() || undefined,
         providerUrl: providerUrl.trim() || undefined,
         apiKey: apiKey.trim() || undefined,
       });
@@ -104,6 +113,8 @@ export function useHumanizer() {
     setProviderUrl,
     apiKey,
     setApiKey,
+    modelName,
+    setModelName,
     isLoading,
     errorMessage,
     setErrorMessage,

@@ -27,6 +27,8 @@ export const App: React.FC = () => {
     setProviderUrl,
     apiKey,
     setApiKey,
+    modelName,
+    setModelName,
     isLoading,
     errorMessage,
     setErrorMessage,
@@ -109,9 +111,11 @@ export const App: React.FC = () => {
         onCloseModal={() => setIsModalOpen(false)}
         initialUrl={providerUrl}
         initialKey={apiKey}
-        onSaveSettings={(savedUrl, savedKey) => {
+        initialModel={modelName}
+        onSaveSettings={(savedUrl, savedKey, savedModel) => {
           setProviderUrl(savedUrl);
           setApiKey(savedKey);
+          setModelName(savedModel);
         }}
       />
     </div>

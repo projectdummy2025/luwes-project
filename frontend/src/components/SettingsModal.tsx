@@ -6,7 +6,8 @@ interface SettingsModalProps {
   onCloseModal: () => void;
   initialUrl: string;
   initialKey: string;
-  onSaveSettings: (updatedUrl: string, updatedKey: string) => void;
+  initialModel: string;
+  onSaveSettings: (updatedUrl: string, updatedKey: string, updatedModel: string) => void;
 }
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
@@ -14,16 +15,18 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onCloseModal,
   initialUrl,
   initialKey,
+  initialModel,
   onSaveSettings,
 }) => {
   const [urlInput, setUrlInput] = useState<string>(initialUrl);
   const [keyInput, setKeyInput] = useState<string>(initialKey);
+  const [modelInput, setModelInput] = useState<string>(initialModel);
 
   // Early return if modal is closed
   if (!isModalOpen) return null;
 
   const handleSave = () => {
-    onSaveSettings(urlInput.trim(), keyInput.trim());
+    onSaveSettings(urlInput.trim(), keyInput.trim(), modelInput.trim());
     onCloseModal();
   };
 
@@ -44,7 +47,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         {/* Modal body */}
         <div className="p-4 flex flex-col gap-3.5">
           <p className="text-[11px] text-stone-500 leading-normal font-light">
-            Configure your OpenAI-compatible provider credentials.
+            Configure your OpenAI-compatible provider credentials and model selection.
           </p>
 
           <div className="flex flex-col gap-1">
@@ -65,6 +68,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               value={keyInput}
               onChange={(event) => setKeyInput(event.target.value)}
               placeholder="sk-..."
+              className="px-2.5 py-1.5 bg-stone-50/50 border border-stone-200 rounded-md text-xs text-stone-800 outline-none focus:border-stone-400 font-mono placeholder:text-stone-300"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-medium text-stone-600">Model Name</label>
+            <input
+              type="text"
+              value={modelInput}
+              onChange={(event) => setModelInput(event.target.value)}
+              placeholder="claude-opus-5"
               className="px-2.5 py-1.5 bg-stone-50/50 border border-stone-200 rounded-md text-xs text-stone-800 outline-none focus:border-stone-400 font-mono placeholder:text-stone-300"
             />
             <span className="text-[10px] text-stone-400">

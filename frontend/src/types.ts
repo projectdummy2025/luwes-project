@@ -20,6 +20,7 @@ export interface ServerConfiguration {
 export interface HumanizePayload {
   sourceText: string;
   toneValue: string;
+  modelName?: string;
   providerUrl?: string;
   apiKey?: string;
 }
