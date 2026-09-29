@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Zap, Sparkles } from 'lucide-react';
 import { useHumanizer } from './hooks/useHumanizer';
 import { Header } from './components/Header';
 import { EditorCard } from './components/EditorCard';
@@ -57,27 +57,27 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Toolbar controls with generous pill sizing */}
+        {/* Toolbar controls with space-between layout */}
         <div className="flex flex-wrap items-center justify-between gap-4 pb-1">
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Tone selector */}
-            <div className="inline-flex items-center gap-1.5 p-1.5 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs">
-              {TONE_OPTIONS.map((option) => (
-                <button
-                  key={option.id}
-                  onClick={() => setToneValue(option.id)}
-                  className={`px-5 py-2 text-sm transition-all rounded-full ${
-                    toneValue === option.id
-                      ? 'bg-stone-900 text-white font-medium shadow-xs'
-                      : 'text-stone-600 hover:text-stone-950 font-normal hover:bg-stone-200/50'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+          {/* Left: Tone selector */}
+          <div className="inline-flex items-center gap-1.5 p-1.5 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs">
+            {TONE_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                onClick={() => setToneValue(option.id)}
+                className={`px-5 py-2 text-sm transition-all rounded-full ${
+                  toneValue === option.id
+                    ? 'bg-stone-900 text-white font-medium shadow-xs'
+                    : 'text-stone-600 hover:text-stone-950 font-normal hover:bg-stone-200/50'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
 
-            {/* Mode selector */}
+          {/* Right: Mode selector and action button */}
+          <div className="flex flex-wrap items-center gap-3">
             <div className="inline-flex items-center gap-1 p-1 bg-stone-100 border border-stone-200/90 rounded-full shadow-2xs text-xs">
               <button
                 onClick={() => setModeValue('fast')}
@@ -88,7 +88,8 @@ export const App: React.FC = () => {
                 }`}
                 title="1-Pass Fast Humanization"
               >
-                <span>⚡ Cepat</span>
+                <Zap className="w-3.5 h-3.5 text-stone-700" strokeWidth={1.8} />
+                <span>Cepat</span>
               </button>
               <button
                 onClick={() => setModeValue('deep')}
@@ -99,25 +100,26 @@ export const App: React.FC = () => {
                 }`}
                 title="Multi-Pass Adversarial Loopback Refinement"
               >
-                <span>✨ Luwes Mendalam</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" strokeWidth={1.8} />
+                <span>Luwes Mendalam</span>
               </button>
             </div>
-          </div>
 
-          <button
-            onClick={executeHumanize}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-7 py-2.5 rounded-full text-sm font-semibold bg-stone-900 hover:bg-stone-800 text-white shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-          >
-            {isLoading && <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />}
-            <span>
-              {isLoading
-                ? modeValue === 'deep'
-                  ? 'Memoles Mendalam...'
-                  : 'Luweskan Teks...'
-                : 'Luweskan Teks'}
-            </span>
-          </button>
+            <button
+              onClick={executeHumanize}
+              disabled={isLoading}
+              className="flex items-center gap-2 px-7 py-2.5 rounded-full text-sm font-semibold bg-stone-900 hover:bg-stone-800 text-white shadow-sm active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+            >
+              {isLoading && <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.5} />}
+              <span>
+                {isLoading
+                  ? modeValue === 'deep'
+                    ? 'Memoles Mendalam...'
+                    : 'Luweskan Teks...'
+                  : 'Luweskan Teks'}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Dual pane workspace with generous width */}
