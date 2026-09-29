@@ -1,0 +1,312 @@
+import re
+import math
+import json
+import httpx
+from datetime import datetime
+
+# Standard constants for AI cliché phrase detection
+ENGLISH_CLICHES = (
+    r"\bin conclusion\b",
+    r"\bit is important to note\b",
+    r"\bit is worth noting\b",
+    r"\bdelve(?:s|d)? into\b",
+    r"\ba testament to\b",
+    r"\bcrucial role\b",
+    r"\btapestry of\b",
+    r"\bbeacon of\b",
+    r"\bfurthermore\b",
+    r"\bmoreover\b",
+    r"\bnavigating the landscape\b",
+    r"\bin summary\b",
+    r"\bfostering\b",
+    r"\bgame-changer\b",
+    r"\bdive deep(?:ly)?\b",
+    r"\bharness(?:ing)? the power of\b",
+    r"\bplays a pivotal role\b",
+    r"\bin the realm of\b",
+)
+
+INDONESIAN_CLICHES = (
+    r"\boleh karena itu\b",
+    r"\bpenting untuk dicatat(?: bahwa)?\b",
+    r"\bperlu diingat(?: bahwa)?\b",
+    r"\bberperan penting\b",
+    r"\bmemainkan peran penting\b",
+    r"\bdalam era modern ini\b",
+    r"\bdalam lanskap\b",
+    r"\bsebagai kesimpulan\b",
+    r"\bmenjadi bukti(?: bahwa)?\b",
+    r"\bmerupakan hal yang krusial\b",
+    r"\btidak dapat dipungkiri bahwa\b",
+    r"\bmenyelami lebih dalam\b",
+    r"\bdalam rangka untuk\b",
+    r"\bsecara keseluruhan\b",
+)
+
+COMPILED_PATTERNS = [re.compile(pattern, re.IGNORECASE) for pattern in ENGLISH_CLICHES + INDONESIAN_CLICHES]
+
+# Processing limits for chunked execution
+CHUNK_WORD_LIMIT = 500
+MAX_OUTPUT_TOKENS = 8192
+
+SYSTEM_PROMPT = """You are an elite bilingual human editor and writer. Your task is to rewrite AI-generated text into genuinely natural, authentic human writing while preserving the full depth, volume, and structure of the original work.
+
+Core Directives:
+1. Balanced Output Volume:
+   - Do NOT summarize, compress, or condense the content.
+   - Preserve all ideas, arguments, explanations, nuances, and paragraph structures.
+   - The resulting word count should be balanced and closely match the length of the source text (~1:1 ratio).
+
+2. Human Flow & Fluency (Luwes):
+   - Replace mechanical AI sentence transitions (e.g., "Tentu saja", "Perlu diingat bahwa", "Dalam era modern ini", "Secara keseluruhan", "Furthermore", "In conclusion") with natural, organic phrasings.
+   - Vary sentence cadence naturally: blend short, rhythmic statements with fluid, well-structured explanatory sentences.
+   - Use authentic human vocabulary and idioms suitable to the language of the source text (Indonesian or English).
+
+3. Content Fidelity:
+   - Retain every single fact, technical detail, step, and meaning from the original text without introducing unrelated assumptions.
+
+4. Output Format:
+   - Output strictly the humanized text. Do not include introductory remarks, commentary, or markdown code fences."""
+
+
+def logMessage(messageText: str) -> None:
+    # Print formatted log according to rule standard
+    currentTime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"({currentTime}) {messageText}")
+
+
+def splitSentences(sourceText: str) -> list[str]:
+    # Split text into clean sentences by punctuation
+    rawSentences = re.split(r'(?<=[.!?])\s+', sourceText.strip())
+    return [sentence.strip() for sentence in rawSentences if sentence.strip()]
+
+
+def chunkParagraphs(sourceText: str, wordLimit: int = CHUNK_WORD_LIMIT) -> list[str]:
+    # Split text into distinct paragraphs
+    rawParagraphs = re.split(r'\n\s*\n', sourceText.strip())
+    cleanParagraphs = [paragraph.strip() for paragraph in rawParagraphs if paragraph.strip()]
+
+    # Early return if single paragraph or empty
+    if not cleanParagraphs:
+        return [sourceText]
+
+    textChunks = []
+    currentParagraphs = []
+    currentWords = 0
+
+    # Group paragraphs while respecting word limit
+    for paragraphText in cleanParagraphs:
+        paragraphCount = len(re.findall(r'\b\w+\b', paragraphText))
+
+        # Check if adding current paragraph exceeds target limit
+        if currentParagraphs and (currentWords + paragraphCount > wordLimit):
+            textChunks.append("\n\n".join(currentParagraphs))
+            currentParagraphs = [paragraphText]
+            currentWords = paragraphCount
+        else:
+            currentParagraphs.append(paragraphText)
+            currentWords += paragraphCount
+
+    # Append trailing accumulated paragraphs
+    if currentParagraphs:
+        textChunks.append("\n\n".join(currentParagraphs))
+
+    return textChunks
+
+
+def analyzeText(sourceText: str) -> dict:
+    # Guard clause for empty input
+    if not sourceText.strip():
+        return {
+            "wordCount": 0,
+            "sentenceCount": 0,
+            "burstinessScore": 0,
+            "clicheCount": 0,
+            "humanScore": 100,
+            "verdictText": "No text provided",
+        }
+
+    # Extract words and count sentences
+    extractedWords = re.findall(r'\b\w+\b', sourceText.lower())
+    wordCount = len(extractedWords)
+    sentenceList = splitSentences(sourceText)
+    sentenceCount = len(sentenceList)
+
+    # Compute sentence lengths and burstiness standard deviation
+    lengthList = [len(re.findall(r'\b\w+\b', sentence)) for sentence in sentenceList]
+    averageLength = sum(lengthList) / max(1, sentenceCount)
+    varianceValue = sum((length - averageLength) ** 2 for length in lengthList) / max(1, sentenceCount)
+    standardDeviation = math.sqrt(varianceValue)
+    burstinessScore = min(100, round(standardDeviation * 8.5))
+
+    # Detect known AI cliché patterns
+    detectedList = []
+    for pattern in COMPILED_PATTERNS:
+        matches = pattern.findall(sourceText)
+        if matches:
+            detectedList.extend(matches)
+    clicheCount = len(detectedList)
+
+    # Calculate human authenticity score
+    baseScore = 75
+    clichePenalty = min(40, clicheCount * 8)
+    burstinessBonus = 15 if standardDeviation >= 7.0 else (-10 if standardDeviation < 3.0 and sentenceCount > 2 else 0)
+    calculatedScore = max(10, min(98, baseScore - clichePenalty + burstinessBonus))
+
+    # Assign descriptive verdict
+    if calculatedScore >= 80:
+        verdictText = "Natural Human"
+    elif calculatedScore >= 55:
+        verdictText = "Mixed Elements"
+    else:
+        verdictText = "AI Pattern"
+
+    return {
+        "wordCount": wordCount,
+        "sentenceCount": sentenceCount,
+        "burstinessScore": burstinessScore,
+        "clicheCount": clicheCount,
+        "humanScore": calculatedScore,
+        "verdictText": verdictText,
+    }
+
+
+async def executePrompt(
+    sourceText: str,
+    providerUrl: str,
+    apiKey: str,
+    toneValue: str = "natural",
+    modelName: str = "claude-opus-5",
+    timeoutSeconds: float = 60.0,
+    temperatureValue: float = 0.75
+) -> str:
+    # Map selected tone to descriptive guidance
+    toneDescriptions = {
+        "natural": "Natural and conversational human tone.",
+        "academic": "Rigorous academic style, scholarly yet fluid.",
+        "professional": "Polished workplace tone, articulate and persuasive.",
+        "casual": "Relaxed and expressive tone, very approachable.",
+    }
+    toneGuide = toneDescriptions.get(toneValue.lower(), toneDescriptions["natural"])
+
+    # Format user request message with tone and depth guidelines
+    userContent = (
+        f"Tone style: {toneGuide}\n\n"
+        f"Please rewrite the following text with human fluency while maintaining its full depth, details, and length:\n\n"
+        f"{sourceText}"
+    )
+
+    payloadData = {
+        "model": modelName,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": userContent}
+        ],
+        "temperature": temperatureValue,
+        "max_tokens": MAX_OUTPUT_TOKENS,
+        "stream": False,
+    }
+
+    headerData = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {apiKey}" if apiKey else ""
+    }
+
+    endpointUrl = f"{providerUrl.rstrip('/')}/chat/completions"
+
+    # Execute asynchronous HTTP request with configured timeout
+    async with httpx.AsyncClient(timeout=timeoutSeconds) as httpClient:
+        responseObject = await httpClient.post(endpointUrl, headers=headerData, json=payloadData)
+        
+        # Check HTTP status
+        if responseObject.status_code != 200:
+            logMessage(f"Provider error received: status {responseObject.status_code}")
+            raise ValueError(f"Provider API returned status {responseObject.status_code}: {responseObject.text}")
+
+        contentType = responseObject.headers.get("content-type", "")
+        responseText = responseObject.text.strip()
+
+        # Handle Server-Sent Events stream format if returned
+        if "text/event-stream" in contentType or responseText.startswith("data:"):
+            collectedFragments = []
+            for streamLine in responseText.splitlines():
+                cleanLine = streamLine.strip()
+                if not cleanLine.startswith("data:"):
+                    continue
+                chunkPayload = cleanLine[5:].strip()
+                if chunkPayload == "[DONE]":
+                    break
+                try:
+                    chunkData = json.loads(chunkPayload)
+                    deltaObject = chunkData.get("choices", [{}])[0].get("delta", {})
+                    deltaContent = deltaObject.get("content", "")
+                    if deltaContent:
+                        collectedFragments.append(deltaContent)
+                except json.JSONDecodeError:
+                    continue
+            if collectedFragments:
+                return "".join(collectedFragments).strip()
+
+        # Parse standard JSON response
+        try:
+            responseData = responseObject.json()
+        except Exception as jsonError:
+            logMessage("Failed to parse provider JSON response")
+            raise ValueError(f"Provider returned invalid response format: {responseText[:200]}") from jsonError
+
+        # Extract response content safely
+        return responseData["choices"][0]["message"]["content"].strip()
+
+
+async def requestHumanization(
+    sourceText: str,
+    providerUrl: str,
+    apiKey: str,
+    toneValue: str = "natural",
+    modelName: str = "claude-opus-5",
+    timeoutSeconds: float = 60.0,
+    temperatureValue: float = 0.75
+) -> str:
+    # Validate provider URL before executing
+    if not providerUrl:
+        logMessage("Execution failed: Missing provider URL")
+        raise ValueError("Provider URL is required for OpenAI-compatible endpoint")
+
+    # Split source text into balanced paragraph chunks
+    textChunks = chunkParagraphs(sourceText, CHUNK_WORD_LIMIT)
+    totalChunks = len(textChunks)
+
+    # Process directly if text falls within single chunk
+    if totalChunks == 1:
+        logMessage(f"Starting text humanization with {modelName}")
+        resultText = await executePrompt(
+            sourceText=sourceText,
+            providerUrl=providerUrl,
+            apiKey=apiKey,
+            toneValue=toneValue,
+            modelName=modelName,
+            timeoutSeconds=timeoutSeconds,
+            temperatureValue=temperatureValue
+        )
+        logMessage("Humanization completed successfully")
+        return resultText
+
+    # Execute phased chunking for longer documents
+    logMessage(f"Splitting text into {totalChunks} chunks for processing")
+    processedChunks = []
+
+    for chunkIndex, chunkText in enumerate(textChunks):
+        logMessage(f"Processing chunk {chunkIndex + 1} of {totalChunks}")
+        resultChunk = await executePrompt(
+            sourceText=chunkText,
+            providerUrl=providerUrl,
+            apiKey=apiKey,
+            toneValue=toneValue,
+            modelName=modelName,
+            timeoutSeconds=timeoutSeconds,
+            temperatureValue=temperatureValue
+        )
+        processedChunks.append(resultChunk)
+
+    logMessage("All chunks processed successfully")
+    return "\n\n".join(processedChunks)
