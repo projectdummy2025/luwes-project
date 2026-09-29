@@ -2,8 +2,9 @@ import re
 import math
 import json
 import asyncio
-import httpx
+from typing import Optional
 from datetime import datetime
+import httpx
 
 # Standard constants for AI cliché phrase detection
 ENGLISH_CLICHES = (
@@ -28,6 +29,7 @@ ENGLISH_CLICHES = (
 )
 
 INDONESIAN_CLICHES = (
+    r"\btentu saja\b",
     r"\boleh karena itu\b",
     r"\bpenting untuk dicatat(?: bahwa)?\b",
     r"\bperlu diingat(?: bahwa)?\b",
@@ -42,6 +44,7 @@ INDONESIAN_CLICHES = (
     r"\bmenyelami lebih dalam\b",
     r"\bdalam rangka untuk\b",
     r"\bsecara keseluruhan\b",
+    r"\bpatut digarisbawahi\b",
 )
 
 COMPILED_PATTERNS = [re.compile(pattern, re.IGNORECASE) for pattern in ENGLISH_CLICHES + INDONESIAN_CLICHES]
@@ -55,6 +58,8 @@ MAX_PENALTY = 40
 BURST_THRESHOLD = 7.0
 BURST_BONUS = 15
 FLAT_PENALTY = 10
+TARGET_HUMAN_SCORE = 85
+REFINEMENT_TEMPERATURE = 0.85
 
 SYSTEM_PROMPT = """You are an elite bilingual human editor and writer. Your task is to rewrite AI-generated text into genuinely natural, authentic human writing while preserving the full depth, volume, and structure of the original work.
 
@@ -131,6 +136,7 @@ def analyzeText(sourceText: str) -> dict:
             "clicheCount": 0,
             "humanScore": 100,
             "verdictText": "No text provided",
+            "flaggedSentences": [],
         }
 
     # Extract words and count sentences
@@ -146,12 +152,19 @@ def analyzeText(sourceText: str) -> dict:
     standardDeviation = math.sqrt(varianceValue)
     burstinessScore = min(100, round(standardDeviation * 8.5))
 
-    # Detect known AI cliché patterns
+    # Detect known AI cliché patterns and identify flagged sentences
     detectedList = []
-    for pattern in COMPILED_PATTERNS:
-        matches = pattern.findall(sourceText)
-        if matches:
-            detectedList.extend(matches)
+    flaggedSentences = []
+    for sentenceItem in sentenceList:
+        sentenceMatches = []
+        for pattern in COMPILED_PATTERNS:
+            foundPatterns = pattern.findall(sentenceItem)
+            if foundPatterns:
+                sentenceMatches.extend(foundPatterns)
+        if sentenceMatches:
+            detectedList.extend(sentenceMatches)
+            flaggedSentences.append(sentenceItem)
+
     clicheCount = len(detectedList)
 
     # Calculate human authenticity score
@@ -174,6 +187,7 @@ def analyzeText(sourceText: str) -> dict:
         "clicheCount": clicheCount,
         "humanScore": calculatedScore,
         "verdictText": verdictText,
+        "flaggedSentences": flaggedSentences,
     }
 
 
@@ -184,23 +198,26 @@ async def executePrompt(
     toneValue: str = "natural",
     modelName: str = "claude-opus-5",
     timeoutSeconds: float = 60.0,
-    temperatureValue: float = 0.75
+    temperatureValue: float = 0.75,
+    customInstruction: Optional[str] = None
 ) -> str:
-    # Map selected tone to descriptive guidance
-    toneDescriptions = {
-        "natural": "Natural and conversational human tone.",
-        "academic": "Rigorous academic style, scholarly yet fluid.",
-        "business": "Polished workplace tone, articulate and persuasive.",
-        "casual": "Relaxed and expressive tone, very approachable.",
-    }
-    toneGuide = toneDescriptions.get(toneValue.lower(), toneDescriptions["natural"])
+    # Use custom instruction if provided, else construct tone guidance
+    if customInstruction:
+        userContent = customInstruction
+    else:
+        toneDescriptions = {
+            "natural": "Natural and conversational human tone.",
+            "academic": "Rigorous academic style, scholarly yet fluid.",
+            "business": "Polished workplace tone, articulate and persuasive.",
+            "casual": "Relaxed and expressive tone, very approachable.",
+        }
+        toneGuide = toneDescriptions.get(toneValue.lower(), toneDescriptions["natural"])
 
-    # Format user request message with tone and depth guidelines
-    userContent = (
-        f"Tone style: {toneGuide}\n\n"
-        f"Please rewrite the following text with human fluency while maintaining its full depth, details, and length:\n\n"
-        f"{sourceText}"
-    )
+        userContent = (
+            f"Tone style: {toneGuide}\n\n"
+            f"Please rewrite the following text with human fluency while maintaining its full depth, details, and length:\n\n"
+            f"{sourceText}"
+        )
 
     payloadData = {
         "model": modelName,
@@ -269,6 +286,7 @@ async def requestHumanization(
     providerUrl: str,
     apiKey: str,
     toneValue: str = "natural",
+    modeValue: str = "fast",
     modelName: str = "claude-opus-5",
     timeoutSeconds: float = 60.0,
     temperatureValue: float = 0.75
@@ -282,10 +300,10 @@ async def requestHumanization(
     textChunks = chunkParagraphs(sourceText, CHUNK_WORD_LIMIT)
     totalChunks = len(textChunks)
 
-    # Process directly if text falls within single chunk
+    # Execute Pass 1 (Drafting)
     if totalChunks == 1:
-        logMessage(f"Starting text humanization with {modelName}")
-        resultText = await executePrompt(
+        logMessage(f"Starting text humanization with {modelName} in {modeValue} mode")
+        draftText = await executePrompt(
             sourceText=sourceText,
             providerUrl=providerUrl,
             apiKey=apiKey,
@@ -294,24 +312,57 @@ async def requestHumanization(
             timeoutSeconds=timeoutSeconds,
             temperatureValue=temperatureValue
         )
-        logMessage("Humanization completed successfully")
-        return resultText
+    else:
+        logMessage(f"Processing {totalChunks} text chunks concurrently in {modeValue} mode")
+        chunkTasks = [
+            executePrompt(
+                sourceText=chunkText,
+                providerUrl=providerUrl,
+                apiKey=apiKey,
+                toneValue=toneValue,
+                modelName=modelName,
+                timeoutSeconds=timeoutSeconds,
+                temperatureValue=temperatureValue
+            )
+            for chunkText in textChunks
+        ]
+        processedChunks = await asyncio.gather(*chunkTasks)
+        draftText = "\n\n".join(processedChunks)
 
-    # Execute concurrent chunking for longer documents
-    logMessage(f"Processing {totalChunks} text chunks concurrently")
-    chunkTasks = [
-        executePrompt(
-            sourceText=chunkText,
-            providerUrl=providerUrl,
-            apiKey=apiKey,
-            toneValue=toneValue,
-            modelName=modelName,
-            timeoutSeconds=timeoutSeconds,
-            temperatureValue=temperatureValue
-        )
-        for chunkText in textChunks
-    ]
+    # Return draft immediately if fast mode is selected
+    if modeValue != "deep":
+        logMessage("Humanization completed via fast mode")
+        return draftText
 
-    processedChunks = await asyncio.gather(*chunkTasks)
-    logMessage("All chunks processed successfully")
-    return "\n\n".join(processedChunks)
+    # Audit draft for adversarial closed-loop evaluation
+    auditMetrics = analyzeText(draftText)
+    needsRefinement = (auditMetrics["humanScore"] < TARGET_HUMAN_SCORE) or bool(auditMetrics["flaggedSentences"])
+
+    # Early return if draft already exceeds threshold
+    if not needsRefinement:
+        logMessage(f"Draft achieved human score {auditMetrics['humanScore']}. No refinement needed")
+        return draftText
+
+    # Execute Pass 2 (Adversarial Refinement)
+    logMessage(f"Draft score {auditMetrics['humanScore']} below target {TARGET_HUMAN_SCORE}. Initiating refinement pass...")
+    flaggedSample = "\n".join(f"- {sentence}" for sentence in auditMetrics["flaggedSentences"][:4])
+    refineInstruction = (
+        f"The following rewritten text is good, but these specific sentences still sound robotic or contain AI clichés:\n"
+        f"{flaggedSample}\n\n"
+        f"Please perform a second-pass polish. Restructure those stiff sentences into natural, organic human expressions with lively cadence, while keeping all facts, paragraph layout, and text volume:\n\n"
+        f"{draftText}"
+    )
+
+    refinedText = await executePrompt(
+        sourceText=draftText,
+        providerUrl=providerUrl,
+        apiKey=apiKey,
+        toneValue=toneValue,
+        modelName=modelName,
+        timeoutSeconds=timeoutSeconds,
+        temperatureValue=REFINEMENT_TEMPERATURE,
+        customInstruction=refineInstruction
+    )
+
+    logMessage("Adversarial refinement pass completed successfully")
+    return refinedText

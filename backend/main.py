@@ -28,6 +28,7 @@ class AnalysisRequest(BaseModel):
 class HumanizeRequest(BaseModel):
     sourceText: str = Field(..., min_length=1)
     toneValue: str = Field(default="natural")
+    modeValue: str = Field(default="fast")
     modelName: Optional[str] = Field(default=None)
     providerUrl: Optional[str] = Field(default=None)
     apiKey: Optional[str] = Field(default=None)
@@ -76,6 +77,7 @@ async def executeHumanization(requestBody: HumanizeRequest):
             providerUrl=activeUrl,
             apiKey=activeKey,
             toneValue=requestBody.toneValue,
+            modeValue=requestBody.modeValue,
             modelName=activeModel,
             timeoutSeconds=applicationConfig.requestTimeout,
             temperatureValue=applicationConfig.modelTemperature,

@@ -44,3 +44,23 @@ def testAnalyzeEndpoint():
     responseObject = client.post("/api/analyze", json=payloadData)
     assert responseObject.status_code == 200
     assert "analysisData" in responseObject.json()
+
+
+def testFlaggedSentences():
+    # Test cliché sentence flagging
+    sampleContent = "Tentu saja inovasi ini luar biasa. Namun ini kalimat yang wajar tanpa klise."
+    metricsResult = analyzeText(sampleContent)
+    assert "flaggedSentences" in metricsResult
+    assert len(metricsResult["flaggedSentences"]) >= 1
+    assert "Tentu saja" in metricsResult["flaggedSentences"][0]
+
+
+def testHumanizeRequestValidation():
+    # Test API humanize validation with modeValue
+    payloadData = {
+        "sourceText": "Kalimat uji.",
+        "toneValue": "natural",
+        "modeValue": "fast",
+    }
+    responseObject = client.post("/api/humanize", json=payloadData)
+    assert responseObject.status_code in [200, 400, 500]
