@@ -28,6 +28,7 @@ class AnalysisRequest(BaseModel):
 class HumanizeRequest(BaseModel):
     sourceText: str = Field(..., min_length=1)
     toneValue: str = Field(default="natural")
+    modelName: Optional[str] = Field(default=None)
     providerUrl: Optional[str] = Field(default=None)
     apiKey: Optional[str] = Field(default=None)
 
@@ -56,9 +57,10 @@ async def executeAnalysis(requestBody: AnalysisRequest):
 
 @applicationServer.post("/api/humanize")
 async def executeHumanization(requestBody: HumanizeRequest):
-    # Determine effective provider URL and API key
+    # Determine effective provider URL, API key, and model name
     activeUrl = requestBody.providerUrl or applicationConfig.providerUrl
     activeKey = requestBody.apiKey or applicationConfig.apiKey
+    activeModel = requestBody.modelName or applicationConfig.modelName
 
     # Guard clause if provider URL is missing
     if not activeUrl:
@@ -67,18 +69,18 @@ async def executeHumanization(requestBody: HumanizeRequest):
             detail="Provider URL is missing. Please provide it in settings or .env"
         )
 
-    # Perform humanization using target model claude-opus-5
+    # Perform humanization using target model
     try:
         resultText = await requestHumanization(
             sourceText=requestBody.sourceText,
             providerUrl=activeUrl,
             apiKey=activeKey,
             toneValue=requestBody.toneValue,
-            modelName=applicationConfig.modelName,
+            modelName=activeModel,
             timeoutSeconds=applicationConfig.requestTimeout,
             temperatureValue=applicationConfig.modelTemperature,
         )
-        
+
         # Analyze resulting text for comparison
         resultAnalysis = analyzeText(resultText)
 

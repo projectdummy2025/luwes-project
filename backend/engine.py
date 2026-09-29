@@ -1,6 +1,7 @@
 import re
 import math
 import json
+import asyncio
 import httpx
 from datetime import datetime
 
@@ -48,6 +49,12 @@ COMPILED_PATTERNS = [re.compile(pattern, re.IGNORECASE) for pattern in ENGLISH_C
 # Processing limits for chunked execution
 CHUNK_WORD_LIMIT = 500
 MAX_OUTPUT_TOKENS = 8192
+BASE_SCORE = 75
+CLICHE_WEIGHT = 8
+MAX_PENALTY = 40
+BURST_THRESHOLD = 7.0
+BURST_BONUS = 15
+FLAT_PENALTY = 10
 
 SYSTEM_PROMPT = """You are an elite bilingual human editor and writer. Your task is to rewrite AI-generated text into genuinely natural, authentic human writing while preserving the full depth, volume, and structure of the original work.
 
@@ -148,10 +155,9 @@ def analyzeText(sourceText: str) -> dict:
     clicheCount = len(detectedList)
 
     # Calculate human authenticity score
-    baseScore = 75
-    clichePenalty = min(40, clicheCount * 8)
-    burstinessBonus = 15 if standardDeviation >= 7.0 else (-10 if standardDeviation < 3.0 and sentenceCount > 2 else 0)
-    calculatedScore = max(10, min(98, baseScore - clichePenalty + burstinessBonus))
+    clichePenalty = min(MAX_PENALTY, clicheCount * CLICHE_WEIGHT)
+    burstinessBonus = BURST_BONUS if standardDeviation >= BURST_THRESHOLD else (-FLAT_PENALTY if standardDeviation < 3.0 and sentenceCount > 2 else 0)
+    calculatedScore = max(10, min(98, BASE_SCORE - clichePenalty + burstinessBonus))
 
     # Assign descriptive verdict
     if calculatedScore >= 80:
@@ -184,7 +190,7 @@ async def executePrompt(
     toneDescriptions = {
         "natural": "Natural and conversational human tone.",
         "academic": "Rigorous academic style, scholarly yet fluid.",
-        "professional": "Polished workplace tone, articulate and persuasive.",
+        "business": "Polished workplace tone, articulate and persuasive.",
         "casual": "Relaxed and expressive tone, very approachable.",
     }
     toneGuide = toneDescriptions.get(toneValue.lower(), toneDescriptions["natural"])
@@ -217,7 +223,7 @@ async def executePrompt(
     # Execute asynchronous HTTP request with configured timeout
     async with httpx.AsyncClient(timeout=timeoutSeconds) as httpClient:
         responseObject = await httpClient.post(endpointUrl, headers=headerData, json=payloadData)
-        
+
         # Check HTTP status
         if responseObject.status_code != 200:
             logMessage(f"Provider error received: status {responseObject.status_code}")
@@ -291,13 +297,10 @@ async def requestHumanization(
         logMessage("Humanization completed successfully")
         return resultText
 
-    # Execute phased chunking for longer documents
-    logMessage(f"Splitting text into {totalChunks} chunks for processing")
-    processedChunks = []
-
-    for chunkIndex, chunkText in enumerate(textChunks):
-        logMessage(f"Processing chunk {chunkIndex + 1} of {totalChunks}")
-        resultChunk = await executePrompt(
+    # Execute concurrent chunking for longer documents
+    logMessage(f"Processing {totalChunks} text chunks concurrently")
+    chunkTasks = [
+        executePrompt(
             sourceText=chunkText,
             providerUrl=providerUrl,
             apiKey=apiKey,
@@ -306,7 +309,9 @@ async def requestHumanization(
             timeoutSeconds=timeoutSeconds,
             temperatureValue=temperatureValue
         )
-        processedChunks.append(resultChunk)
+        for chunkText in textChunks
+    ]
 
+    processedChunks = await asyncio.gather(*chunkTasks)
     logMessage("All chunks processed successfully")
     return "\n\n".join(processedChunks)
