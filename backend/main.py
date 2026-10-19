@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 from config import applicationConfig
 from engine import analyzeText, requestHumanization, logMessage
+from evaluation import PairwiseResult, judgeCandidates
 
 # Initialize FastAPI application
 applicationServer = FastAPI(title="Luwesin API", version="2.0.0")
@@ -29,6 +30,15 @@ class HumanizeRequest(BaseModel):
     sourceText: str = Field(..., min_length=1)
     toneValue: str = Field(default="natural")
     modeValue: str = Field(default="fast")
+    modelName: Optional[str] = Field(default=None)
+    providerUrl: Optional[str] = Field(default=None)
+    apiKey: Optional[str] = Field(default=None)
+
+
+class EvaluationRequest(BaseModel):
+    sourceText: str = Field(..., min_length=1)
+    firstText: str = Field(..., min_length=1)
+    secondText: str = Field(..., min_length=1)
     modelName: Optional[str] = Field(default=None)
     providerUrl: Optional[str] = Field(default=None)
     apiKey: Optional[str] = Field(default=None)
@@ -94,6 +104,32 @@ async def executeHumanization(requestBody: HumanizeRequest):
         raise HTTPException(status_code=400, detail=str(validationError))
     except Exception as serverError:
         raise HTTPException(status_code=500, detail=f"Failed to process: {str(serverError)}")
+
+
+
+@applicationServer.post("/api/evaluate")
+async def executeEvaluation(requestBody: EvaluationRequest) -> PairwiseResult:
+    # Use the configured provider while keeping rubric results separate from rewriting
+    activeUrl = requestBody.providerUrl or applicationConfig.providerUrl
+    activeKey = requestBody.apiKey or applicationConfig.apiKey
+    activeModel = requestBody.modelName or applicationConfig.modelName
+    if not activeUrl:
+        raise HTTPException(status_code=400, detail="Provider URL is missing. Please provide it in settings or .env")
+
+    try:
+        return await judgeCandidates(
+            sourceText=requestBody.sourceText,
+            firstText=requestBody.firstText,
+            secondText=requestBody.secondText,
+            providerUrl=activeUrl,
+            apiKey=activeKey,
+            modelName=activeModel,
+            timeoutSeconds=applicationConfig.requestTimeout,
+        )
+    except ValueError as validationError:
+        raise HTTPException(status_code=400, detail=str(validationError))
+    except Exception as serverError:
+        raise HTTPException(status_code=500, detail=f"Failed to evaluate: {str(serverError)}")
 
 
 if __name__ == "__main__":
