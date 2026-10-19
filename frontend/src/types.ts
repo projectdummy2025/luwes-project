@@ -2,9 +2,8 @@
 export interface AnalysisMetrics {
   wordCount: number;
   sentenceCount: number;
-  burstinessScore: number;
   clicheCount: number;
-  humanScore: number;
+  styleIssueCount: number;
   verdictText: string;
   flaggedSentences?: string[];
 }
